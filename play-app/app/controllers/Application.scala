@@ -75,4 +75,13 @@ object Application extends Controller with RequestTimeout {
     Ok(views.html.index(s"The next int is: ${Random.nextInt(100) + 1}"))
   }
 
+  def myTimeoutVersion:SimpleResult =
+    Ok(views.html.index(s"THERE WAS A TIMOUT!  But you may not notice ;-)"))
+
+  // Timeout a synchronous request using the DSL with custom alternate body
+  def index4 = timeoutAction(alternateBody = myTimeoutVersion).nonAsync {
+    Thread.sleep(Random.nextInt(4)*1000)
+    Ok(views.html.index(s"The next int is: ${Random.nextInt(100) + 1}"))
+  }
+
 }
