@@ -33,6 +33,23 @@ trait RequestTimeout { this:Controller =>
     }
   }
 
+  // Support for a DSL that times-out everything
+  class TimeoutActionDSL[A](bodyParser: BodyParser[A],
+                            alternateBody: => SimpleResult,
+                            maxTime:FiniteDuration) {
+    def apply(block: => Future[SimpleResult]): Action[A] = Action.async(bodyParser)(_ => timeoutFuture(alternateBody,maxTime)(block))
+    def apply(block: Request[A] => Future[SimpleResult]): Action[A] = Action.async(bodyParser)(r => timeoutFuture(alternateBody,maxTime)(block(r)))
+  }
+
+  final def timeoutAction(alternateBody: => SimpleResult = RequestTimeout("Request timeout"),
+                          maxTime:FiniteDuration = actionTimeout): TimeoutActionDSL[AnyContent] =
+                            timeoutAction(BodyParsers.parse.anyContent,alternateBody,maxTime)
+
+  final def timeoutAction[A](bodyParser: BodyParser[A],
+                             alternateBody: => SimpleResult = RequestTimeout("Request timeout"),
+                             maxTime:FiniteDuration = actionTimeout): TimeoutActionDSL[A] =
+                               new TimeoutActionDSL[A](bodyParser,alternateBody,maxTime)
+
 }
 
 object Application extends Controller with RequestTimeout {
@@ -45,4 +62,8 @@ object Application extends Controller with RequestTimeout {
     }
   }
 
+  // Same as above but using the DSL
+  def index2 = timeoutAction()(ExpensiveThing.nextInt(Random.nextInt(100)).map { i =>
+        Ok(views.html.index(s"The next int is: $i"))
+      })
 }
