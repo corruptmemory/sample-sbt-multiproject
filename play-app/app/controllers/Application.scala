@@ -37,6 +37,8 @@ trait RequestTimeout { this:Controller =>
   class TimeoutActionDSL[A](bodyParser: BodyParser[A],
                             alternateBody: => SimpleResult,
                             maxTime:FiniteDuration) {
+    def nonAsync(block: => SimpleResult): Action[A] = apply(Future(block))
+    def nonAsync(block: Request[A] => SimpleResult): Action[A] = apply(r => Future(block(r)))
     def apply(block: => Future[SimpleResult]): Action[A] = Action.async(bodyParser)(_ => timeoutFuture(alternateBody,maxTime)(block))
     def apply(block: Request[A] => Future[SimpleResult]): Action[A] = Action.async(bodyParser)(r => timeoutFuture(alternateBody,maxTime)(block(r)))
   }
@@ -66,4 +68,11 @@ object Application extends Controller with RequestTimeout {
   def index2 = timeoutAction()(ExpensiveThing.nextInt(Random.nextInt(100)).map { i =>
         Ok(views.html.index(s"The next int is: $i"))
       })
+
+  // Timeout a synchronous request using the DSL
+  def index3 = timeoutAction().nonAsync {
+    Thread.sleep(Random.nextInt(4)*1000)
+    Ok(views.html.index(s"The next int is: ${Random.nextInt(100) + 1}"))
+  }
+
 }
